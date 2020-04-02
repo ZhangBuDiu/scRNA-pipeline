@@ -1,0 +1,5 @@
+
+
+
+## scran
+BiocManager::install("scran")

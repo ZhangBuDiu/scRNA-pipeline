@@ -1,0 +1,78 @@
+---
+title: "scran"
+author: "Zhang Yaru"
+date: "2020/4/1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE)
+```
+
+## scran
+* [official vignette](https://bioconductor.org/packages/release/bioc/vignettes/scran/inst/doc/scran.html)
+* The scran package implements methods to perform low-level processing of scRNA-seq data, including cell cycle phase assignment, scaling normalization, variance modelling and testing for corrrelated genes. 
+* Normalization by deconvolution
+
+
+```{r,eval=FALSE}
+suppressPackageStartupMessages(library("scran"))
+suppressPackageStartupMessages(library("scater"))
+```
+
+
+## load data
+
+* example data: [GSE75748](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE75748)
+* date: 2016
+* number of cells: 1018
+* cell types: H1 H9 NPC EC DEC HFF TB
+* The counts used arised from RSEM, called expected counts.(not integrate)
+
+```{r}
+data = readRDS('../../data/GSE75748/stemCell_1018.rds')
+counts = data$expected_counts
+counts = apply(counts,2,function(x) {storage.mode(x) = 'integer'; x})
+TPM = data$TPM
+```
+
+## prepare data as SingleCellExperiment object
+```{r}
+sc = SingleCellExperiment::SingleCellExperiment(
+  assays = list(counts = counts),
+  colData = as.data.frame(data$cell_type)
+)
+```
+
+
+## Normalization based on gene counts
+* `computeSumFactors` implements the deconvolution strategy for scaling normalization
+* For larger data sets, clustering should be performed with the quickCluster function before normalization.
+```{r}
+clusters = scran::quickCluster(sc)
+sc = scran::computeSumFactors(sc, clusters=clusters)
+summary(SingleCellExperiment::sizeFactors(sc))
+```
+
+
+* log-transform normalization using deconvolution size factors 
+```{r}
+sc = scater::logNormCounts(sc,size_factors=SingleCellExperiment::sizeFactors(sc))
+```
+
+* log-transfrom normalization using library size factors
+```{r}
+lib_sc = scater::librarySizeFactors(sc)
+sc2 = scater::logNormCounts(sc,size_factors=lib_sc)
+```
+
+## relationship between library size factors and deconvolution size factors
+* this two form of normalization capture similar bias.
+```{r}
+plot(lib_sc, SingleCellExperiment::sizeFactors(sc), xlab="Library size factor",
+    ylab="Deconvolution size factor", pch=16,
+    col=as.integer(factor(sc$`data$cell_type`)))
+abline(a=0, b=1, col="red")
+```
+
+
